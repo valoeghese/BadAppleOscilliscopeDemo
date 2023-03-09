@@ -1,6 +1,7 @@
 package valoeghese.badapple;
 
 import javax.imageio.ImageIO;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -43,7 +44,8 @@ public class BadAppleOscilliscope {
 					frame = ImageIO.read(stream);
 				}
 
-				BufferedImage outputFrame = detectEdges(frame);
+				BufferedImage outputFrame = new BufferedImage(resolutionX, resolutionY, BufferedImage.TYPE_INT_RGB);
+				detectEdges(frame, outputFrame, i & 1);
 
 				Path outputFile = outputFolder.resolve("output_" + i);
 				Files.createFile(outputFile);
@@ -51,10 +53,82 @@ public class BadAppleOscilliscope {
 				try (OutputStream stream = new BufferedOutputStream(Files.newOutputStream(outputFile))) {
 					ImageIO.write(outputFrame, "png", stream);
 				}
+
+				i++;
 			}
 
 			time = System.currentTimeMillis() - time;
 			System.out.println("Processed " + i + " frames in " + time + " ms.");
 		}
+	}
+
+	public static void detectEdges(BufferedImage in, BufferedImage out, int skip) {
+		// write black image
+		Graphics2D graphics2D = out.createGraphics();
+		graphics2D.setColor(Color.BLACK);
+		graphics2D.fillRect(0, 0, out.getWidth(), out.getHeight());
+
+		// detect and find upper and lower edge
+		for (int x = 0; x < out.getWidth(); x++) {
+			// upper edge
+			double xConversionFactor = (double) in.getWidth() / out.getWidth();
+			double yConversionFactor = (double) out.getHeight() / in.getHeight();
+
+			int eqXIn = (int) (xConversionFactor * x);
+			int passes = skip;
+
+			int y;
+			boolean current = reduce(in.getRGB(eqXIn, in.getHeight() - 1));
+
+			for (y = in.getHeight() - 1; y >= 0; y--) {
+				if (reduce(in.getRGB(eqXIn, y)) != current) {
+					current = !current;
+
+					// when passes was 0 exit. That is, tolerate <passes> number of edges before exiting.
+					if (passes-- == 0) {
+						break;
+					}
+				}
+			}
+
+			// if didn't find enough edges, lock to bottom
+			if (passes >= 0) y = 0;
+
+			// convert to output y
+			int eqYOut = (int) (yConversionFactor * y);
+			out.setRGB(x, eqYOut, Color.WHITE.getRGB());
+
+			// Lower Edge
+			//=================
+			passes = skip;
+			current = reduce(in.getRGB(eqXIn, in.getHeight() - 1));
+
+			for (y = 0; y < in.getHeight(); y++) {
+				if (reduce(in.getRGB(eqXIn, y)) != current) {
+					current = !current;
+
+					// when passes was 0 exit. That is, tolerate <passes> number of edges before exiting.
+					if (passes-- == 0) {
+						break;
+					}
+				}
+			}
+
+			// if didn't find enough edges, lock to bottom
+			if (passes >= 0) y = 0;
+
+			// convert to output y
+			eqYOut = (int) (yConversionFactor * y);
+			out.setRGB(x, eqYOut, Color.YELLOW.getRGB());
+		}
+	}
+
+	/**
+	 * Reduce a colour in the full rgb spectrum to two 'colours', represented as a boolean.
+	 * @param rgbColour the rgb colour.
+	 * @return the boolean colour representation.
+	 */
+	private static boolean reduce(int rgbColour) {
+		return rgbColour == 0;
 	}
 }
