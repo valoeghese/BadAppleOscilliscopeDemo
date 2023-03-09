@@ -90,9 +90,14 @@ public class BadAppleOscilliscope {
 		graphics2D.setColor(Color.BLACK);
 		graphics2D.fillRect(0, 0, out.getWidth(), out.getHeight());
 
+		// for continuous line
+		int prevYUpper = -1;
+		int prevYLower = -1;
+
 		// detect and find upper and lower edge
+
 		for (int x = 0; x < out.getWidth(); x++) {
-			// upper edge
+			// Lower edge
 			double xConversionFactor = (double) in.getWidth() / out.getWidth();
 			double yConversionFactor = (double) out.getHeight() / in.getHeight();
 
@@ -114,13 +119,14 @@ public class BadAppleOscilliscope {
 			}
 
 			// if didn't find enough edges, lock to bottom
-			if (passes >= 0) y = 0;
+			if (passes >= 0) y = in.getHeight() - 1;
 
 			// convert to output y
 			int eqYOut = (int) (yConversionFactor * y);
-			out.setRGB(x, eqYOut, Color.WHITE.getRGB());
+			drawVerticalLine(out, x, prevYLower, eqYOut, Color.WHITE.getRGB());
+			prevYLower = eqYOut;
 
-			// Lower Edge
+			// Upper Edge
 			//=================
 			passes = skip;
 			current = reduce(in.getRGB(eqXIn, in.getHeight() - 1));
@@ -137,11 +143,28 @@ public class BadAppleOscilliscope {
 			}
 
 			// if didn't find enough edges, lock to bottom
-			if (passes >= 0) y = 0;
+			if (passes >= 0) y = in.getHeight() - 1;
 
 			// convert to output y
 			eqYOut = (int) (yConversionFactor * y);
-			out.setRGB(x, eqYOut, Color.YELLOW.getRGB());
+			drawVerticalLine(out, x, prevYUpper, eqYOut, Color.YELLOW.getRGB());
+			prevYUpper = eqYOut;
+		}
+	}
+
+	private static void drawVerticalLine(BufferedImage image, int x, int prevY, int nextY, int rgb) {
+		if (prevY == -1) {
+			image.setRGB(x, nextY, rgb);
+		}
+		else if (prevY > nextY) {
+			for (int y = nextY; y <= prevY; y++) {
+				image.setRGB(x, y, rgb);
+			}
+		}
+		else {
+			for (int y = prevY; y <= nextY; y++) {
+				image.setRGB(x, y, rgb);
+			}
 		}
 	}
 
@@ -161,6 +184,6 @@ public class BadAppleOscilliscope {
 	 * @return the boolean colour representation.
 	 */
 	private static boolean reduce(int rgbColour) {
-		return rgbColour == 0;
+		return rgbColour == -1;
 	}
 }
