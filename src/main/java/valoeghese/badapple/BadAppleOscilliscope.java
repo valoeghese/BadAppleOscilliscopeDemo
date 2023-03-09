@@ -9,6 +9,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.zip.ZipEntry;
@@ -22,17 +23,21 @@ public class BadAppleOscilliscope {
 		}
 
 		Path outputFolder = Path.of(args[0]).toAbsolutePath().getParent().resolve("out");
-		Files.createDirectory(outputFolder);
+		try {
+			Files.createDirectory(outputFolder);
+		} catch (FileAlreadyExistsException ignored) {
+		}
 
 		int resolutionX = Integer.parseInt(args[1]);
 		int resolutionY = Integer.parseInt(args[2]);
 
 		try (ZipFile src = new ZipFile(args[0])) {
-			int i = 0;
+			int i = 1;
 			long time = System.currentTimeMillis();
 
 			while (true) {
-				ZipEntry entry = src.getEntry("frames/output_" + i);
+				String id = leftPad(i, 4);
+				ZipEntry entry = src.getEntry("frames/output_" + id + ".jpg");
 
 				if (entry == null) {
 					break;
@@ -47,8 +52,12 @@ public class BadAppleOscilliscope {
 				BufferedImage outputFrame = new BufferedImage(resolutionX, resolutionY, BufferedImage.TYPE_INT_RGB);
 				detectEdges(frame, outputFrame, i & 1);
 
-				Path outputFile = outputFolder.resolve("output_" + i);
-				Files.createFile(outputFile);
+				Path outputFile = outputFolder.resolve("output_" + id);
+
+				try {
+					Files.createFile(outputFile);
+				} catch (FileAlreadyExistsException ignored) {
+				}
 
 				try (OutputStream stream = new BufferedOutputStream(Files.newOutputStream(outputFile))) {
 					ImageIO.write(outputFrame, "png", stream);
@@ -121,6 +130,16 @@ public class BadAppleOscilliscope {
 			eqYOut = (int) (yConversionFactor * y);
 			out.setRGB(x, eqYOut, Color.YELLOW.getRGB());
 		}
+	}
+
+	private static String leftPad(int number, int length) {
+		StringBuilder result = new StringBuilder(String.valueOf(number));
+
+		while (result.length() < length) {
+			result.insert(0, '0');
+		}
+
+		return result.toString();
 	}
 
 	/**
