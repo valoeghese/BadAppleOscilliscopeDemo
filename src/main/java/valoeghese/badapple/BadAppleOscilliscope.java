@@ -17,8 +17,8 @@ import java.util.zip.ZipFile;
 
 public class BadAppleOscilliscope {
 	public static void main(String[] args) throws IOException {
-		if (args.length != 3) {
-			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y>");
+		if (args.length != 3 && args.length != 4) {
+			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y> [debug frame]");
 			return;
 		}
 
@@ -32,43 +32,56 @@ public class BadAppleOscilliscope {
 		int resolutionY = Integer.parseInt(args[2]);
 
 		try (ZipFile src = new ZipFile(args[0])) {
-			int i = 1;
-			long time = System.currentTimeMillis();
-
-			while (true) {
-				String id = leftPad(i, 4);
-				ZipEntry entry = src.getEntry("frames/output_" + id + ".jpg");
-
-				if (entry == null) {
-					break;
-				}
-
-				BufferedImage frame;
-
-				try (InputStream stream = new BufferedInputStream(src.getInputStream(entry))) {
-					frame = ImageIO.read(stream);
-				}
-
-				BufferedImage outputFrame = new BufferedImage(resolutionX, resolutionY, BufferedImage.TYPE_INT_RGB);
-				detectEdges(frame, outputFrame, i & 1);
-
-				Path outputFile = outputFolder.resolve("output_" + id);
-
-				try {
-					Files.createFile(outputFile);
-				} catch (FileAlreadyExistsException ignored) {
-				}
-
-				try (OutputStream stream = new BufferedOutputStream(Files.newOutputStream(outputFile))) {
-					ImageIO.write(outputFrame, "png", stream);
-				}
-
-				i++;
+			if (args.length == 4) {
+				processFrame(Integer.parseInt(args[3]), src, outputFolder, resolutionX, resolutionY);
 			}
+			else {
+				int i = 1;
+				long time = System.currentTimeMillis();
 
-			time = System.currentTimeMillis() - time;
-			System.out.println("Processed " + i + " frames in " + time + " ms.");
+				while (processFrame(i, src, outputFolder, resolutionX, resolutionY)) {
+					if (i % 100 == 0) {
+						System.out.println("Completed " + i + " frames");
+					}
+
+					i++;
+				}
+
+				time = System.currentTimeMillis() - time;
+				System.out.println("Processed " + i + " frames in " + time + " ms.");
+			}
 		}
+	}
+
+	private static boolean processFrame(int i, ZipFile src, Path outputFolder, int resolutionX, int resolutionY) throws IOException {
+		String id = leftPad(i, 4);
+		ZipEntry entry = src.getEntry("frames/output_" + id + ".jpg");
+
+		if (entry == null) {
+			return false;
+		}
+
+		BufferedImage frame;
+
+		try (InputStream stream = new BufferedInputStream(src.getInputStream(entry))) {
+			frame = ImageIO.read(stream);
+		}
+
+		BufferedImage outputFrame = new BufferedImage(resolutionX, resolutionY, BufferedImage.TYPE_INT_RGB);
+		detectEdges(frame, outputFrame, i & 1);
+
+		Path outputFile = outputFolder.resolve("output_" + id + ".png");
+
+		try {
+			Files.createFile(outputFile);
+		} catch (FileAlreadyExistsException ignored) {
+		}
+
+		try (OutputStream stream = new BufferedOutputStream(Files.newOutputStream(outputFile))) {
+			ImageIO.write(outputFrame, "png", stream);
+		}
+
+		return true;
 	}
 
 	public static void detectEdges(BufferedImage in, BufferedImage out, int skip) {
