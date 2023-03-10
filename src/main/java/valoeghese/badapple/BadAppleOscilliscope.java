@@ -129,7 +129,7 @@ public class BadAppleOscilliscope {
 			// Upper Edge
 			//=================
 			passes = skip;
-			current = reduce(in.getRGB(eqXIn, in.getHeight() - 1));
+			current = reduce(in.getRGB(eqXIn, 0));
 
 			for (y = 0; y < in.getHeight(); y++) {
 				if (reduce(in.getRGB(eqXIn, y)) != current) {
