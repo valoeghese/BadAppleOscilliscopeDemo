@@ -17,12 +17,16 @@ public class BadAppleOscilliscope {
 	public static void main(String[] args) throws IOException {
 		List<String> nonFlagArgs = new ArrayList<>();
 		boolean flagRaw = false;
+		boolean flagSpike = false;
 
 		for (String s : args) {
 			if (s.startsWith("--")) {
 				switch (s) {
 				case "--raw":
 					flagRaw = true;
+					break;
+				case "--spike":
+					flagSpike = true;
 					break;
 				default:
 					System.out.println("Unknown flag " + s);
@@ -34,12 +38,12 @@ public class BadAppleOscilliscope {
 			}
 		}
 
-		run(nonFlagArgs.toArray(String[]::new), flagRaw);
+		run(nonFlagArgs.toArray(String[]::new), flagRaw, flagSpike);
 	}
 
-	public static void run(String[] args, boolean raw) throws IOException {
+	public static void run(String[] args, boolean raw, boolean spike) throws IOException {
 		if (args.length != 3 && args.length != 4) {
-			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y> [debug frame] [--raw]");
+			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y> [debug frame] [--raw] [--spike]");
 			return;
 		}
 
@@ -54,17 +58,17 @@ public class BadAppleOscilliscope {
 
 		VideoOutput videoOutput = raw ?
 				new TextFileOutput(outputFolder.resolve("video.txt"), resolutionX, resolutionY) :
-				new BufferedImageOutput(outputFolder, resolutionX, resolutionY, 1);
+				new BufferedImageOutput(outputFolder, resolutionX, resolutionY, spike ? resolutionY + 1 : resolutionY, 1);
 
 		try (ZipFile src = new ZipFile(args[0])) {
 			if (args.length == 4) {
-				processFrame(Integer.parseInt(args[3]), src, videoOutput);
+				processFrame(Integer.parseInt(args[3]), src, videoOutput, spike);
 			}
 			else {
 				int i = 1;
 				long time = System.currentTimeMillis();
 
-				while (processFrame(i, src, videoOutput)) {
+				while (processFrame(i, src, videoOutput, spike)) {
 					if (i % 100 == 0) {
 						System.out.println("Completed " + i + " frames");
 					}
@@ -80,7 +84,7 @@ public class BadAppleOscilliscope {
 		videoOutput.close();
 	}
 
-	private static boolean processFrame(int i, ZipFile src, VideoOutput output) throws IOException {
+	private static boolean processFrame(int i, ZipFile src, VideoOutput output, boolean spike) throws IOException {
 		String id = leftPad(i, 4);
 		ZipEntry entry = src.getEntry("frames/output_" + id + ".jpg");
 
@@ -94,11 +98,11 @@ public class BadAppleOscilliscope {
 			frame = ImageIO.read(stream);
 		}
 
-		detectEdges(frame, output, i & 1);
+		detectEdges(frame, output, i & 1, spike);
 		return true;
 	}
 
-	public static void detectEdges(BufferedImage in, VideoOutput out, int skip) throws IOException {
+	public static void detectEdges(BufferedImage in, VideoOutput out, int skip, boolean spike) throws IOException {
 		final int horizontalResolution = out.getWidth();
 
 		// create output channels
@@ -106,7 +110,6 @@ public class BadAppleOscilliscope {
 		int[] channel2 = new int[horizontalResolution]; // channel 2, for upper edge
 
 		// detect and find upper and lower edge
-
 		for (int x = 0; x < horizontalResolution; x++) {
 			// Lower edge
 			double xConversionFactor = (double) in.getWidth() / horizontalResolution;
@@ -160,6 +163,11 @@ public class BadAppleOscilliscope {
 			channel2[x] = eqYOut;
 		}
 
+		// if spike, override beginning of frame with spike to height. This is useful for aligning on the oscilliscope (trigger).
+		channel1[0] = out.getHeight();
+		channel2[0] = out.getHeight();
+
+		// write the frame
 		out.writeFrame(channel1, channel2);
 	}
 

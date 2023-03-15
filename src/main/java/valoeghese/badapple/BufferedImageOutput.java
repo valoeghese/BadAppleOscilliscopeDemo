@@ -13,18 +13,20 @@ import java.nio.file.Path;
 import static valoeghese.badapple.BadAppleOscilliscope.leftPad;
 
 public final class BufferedImageOutput extends VideoOutput {
-	public BufferedImageOutput(Path directory, int resolutionX, int resolutionY, int startFrameNumber) {
+	public BufferedImageOutput(Path directory, int resolutionX, int resolutionY, int actualHeight, int startFrameNumber) {
 		super(resolutionX, resolutionY);
 		this.directory = directory;
 		this.frameNumber = startFrameNumber;
+		this.actualHeight = actualHeight;
 	}
 
 	private final Path directory;
+	private final int actualHeight;
 	private int frameNumber;
 
 	@Override
 	public void writeFrame(int[] channel1, int[] channel2) throws IOException {
-		BufferedImage outputFrame = new BufferedImage(this.getWidth(), this.getHeight(), BufferedImage.TYPE_INT_RGB);
+		BufferedImage outputFrame = new BufferedImage(this.getWidth(), this.actualHeight, BufferedImage.TYPE_INT_RGB);
 
 		// write black image
 		Graphics2D graphics2D = outputFrame.createGraphics();
