@@ -3,11 +3,16 @@ package valoeghese.badapple;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
 
 public class TextFileOutput extends VideoOutput {
 	public TextFileOutput(Path file, int width, int height) throws IOException {
 		super(width, height);
+
+		if (!Files.exists(file)) {
+			Files.createFile(file);
+		}
 
 		this.writer = Files.newBufferedWriter(file);
 	}
