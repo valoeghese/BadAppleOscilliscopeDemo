@@ -23,8 +23,8 @@ public class TextFileOutput extends VideoOutput {
 		StringBuilder builder = new StringBuilder();
 
 		for (int x = 0; x < channel1.length; x++) {
-			builder.append(this.getHeight() - channel1[x]).append("\t")
-					.append(this.getHeight() - channel2[x]).append("\n");
+			builder.append(this.getHeight() - channel1[x] - 1).append("\t")
+					.append(this.getHeight() - channel2[x] - 1).append("\n");
 		}
 
 		this.writer.write(builder.toString());
