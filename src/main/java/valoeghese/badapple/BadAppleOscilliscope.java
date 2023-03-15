@@ -1,24 +1,45 @@
 package valoeghese.badapple;
 
 import javax.imageio.ImageIO;
-import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 public class BadAppleOscilliscope {
 	public static void main(String[] args) throws IOException {
+		List<String> nonFlagArgs = new ArrayList<>();
+		boolean flagRaw = false;
+
+		for (String s : args) {
+			if (s.startsWith("--")) {
+				switch (s) {
+				case "--raw":
+					flagRaw = true;
+					break;
+				default:
+					System.out.println("Unknown flag " + s);
+					return;
+				}
+			}
+			else {
+				nonFlagArgs.add(s);
+			}
+		}
+
+		run(nonFlagArgs.toArray(String[]::new), flagRaw);
+	}
+
+	public static void run(String[] args, boolean raw) throws IOException {
 		if (args.length != 3 && args.length != 4) {
-			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y> [debug frame]");
+			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y> [debug frame] [--raw]");
 			return;
 		}
 
@@ -31,15 +52,19 @@ public class BadAppleOscilliscope {
 		int resolutionX = Integer.parseInt(args[1]);
 		int resolutionY = Integer.parseInt(args[2]);
 
+		VideoOutput videoOutput = raw ?
+				new TextFileOutput(outputFolder.resolve("video.txt"), resolutionX, resolutionY) :
+				new BufferedImageOutput(outputFolder, resolutionX, resolutionY, 1);
+
 		try (ZipFile src = new ZipFile(args[0])) {
 			if (args.length == 4) {
-				processFrame(Integer.parseInt(args[3]), src, outputFolder, resolutionX, resolutionY);
+				processFrame(Integer.parseInt(args[3]), src, videoOutput);
 			}
 			else {
 				int i = 1;
 				long time = System.currentTimeMillis();
 
-				while (processFrame(i, src, outputFolder, resolutionX, resolutionY)) {
+				while (processFrame(i, src, videoOutput)) {
 					if (i % 100 == 0) {
 						System.out.println("Completed " + i + " frames");
 					}
@@ -51,9 +76,11 @@ public class BadAppleOscilliscope {
 				System.out.println("Processed " + i + " frames in " + time + " ms.");
 			}
 		}
+
+		videoOutput.close();
 	}
 
-	private static boolean processFrame(int i, ZipFile src, Path outputFolder, int resolutionX, int resolutionY) throws IOException {
+	private static boolean processFrame(int i, ZipFile src, VideoOutput output) throws IOException {
 		String id = leftPad(i, 4);
 		ZipEntry entry = src.getEntry("frames/output_" + id + ".jpg");
 
@@ -67,38 +94,22 @@ public class BadAppleOscilliscope {
 			frame = ImageIO.read(stream);
 		}
 
-		BufferedImage outputFrame = new BufferedImage(resolutionX, resolutionY, BufferedImage.TYPE_INT_RGB);
-		detectEdges(frame, outputFrame, i & 1);
-
-		Path outputFile = outputFolder.resolve("output_" + id + ".png");
-
-		try {
-			Files.createFile(outputFile);
-		} catch (FileAlreadyExistsException ignored) {
-		}
-
-		try (OutputStream stream = new BufferedOutputStream(Files.newOutputStream(outputFile))) {
-			ImageIO.write(outputFrame, "png", stream);
-		}
-
+		detectEdges(frame, output, i & 1);
 		return true;
 	}
 
-	public static void detectEdges(BufferedImage in, BufferedImage out, int skip) {
-		// write black image
-		Graphics2D graphics2D = out.createGraphics();
-		graphics2D.setColor(Color.BLACK);
-		graphics2D.fillRect(0, 0, out.getWidth(), out.getHeight());
+	public static void detectEdges(BufferedImage in, VideoOutput out, int skip) throws IOException {
+		final int horizontalResolution = out.getWidth();
 
-		// for continuous line
-		int prevYUpper = -1;
-		int prevYLower = -1;
+		// create output channels
+		int[] channel1 = new int[horizontalResolution]; // channel 1, for lower edge
+		int[] channel2 = new int[horizontalResolution]; // channel 2, for upper edge
 
 		// detect and find upper and lower edge
 
-		for (int x = 0; x < out.getWidth(); x++) {
+		for (int x = 0; x < horizontalResolution; x++) {
 			// Lower edge
-			double xConversionFactor = (double) in.getWidth() / out.getWidth();
+			double xConversionFactor = (double) in.getWidth() / horizontalResolution;
 			double yConversionFactor = (double) out.getHeight() / in.getHeight();
 
 			int eqXIn = (int) (xConversionFactor * x);
@@ -121,10 +132,9 @@ public class BadAppleOscilliscope {
 			// if didn't find enough edges, lock to bottom
 			if (passes >= 0) y = in.getHeight() - 1;
 
-			// convert to output y
+			// convert to output y and write to channel 1
 			int eqYOut = (int) (yConversionFactor * y);
-			drawVerticalLine(out, x, prevYLower, eqYOut, Color.WHITE.getRGB());
-			prevYLower = eqYOut;
+			channel1[x] = eqYOut;
 
 			// Upper Edge
 			//=================
@@ -145,30 +155,15 @@ public class BadAppleOscilliscope {
 			// if didn't find enough edges, lock to bottom
 			if (passes >= 0) y = in.getHeight() - 1;
 
-			// convert to output y
+			// convert to output y and write to channel 2
 			eqYOut = (int) (yConversionFactor * y);
-			drawVerticalLine(out, x, prevYUpper, eqYOut, Color.YELLOW.getRGB());
-			prevYUpper = eqYOut;
+			channel2[x] = eqYOut;
 		}
+
+		out.writeFrame(channel1, channel2);
 	}
 
-	private static void drawVerticalLine(BufferedImage image, int x, int prevY, int nextY, int rgb) {
-		if (prevY == -1) {
-			image.setRGB(x, nextY, rgb);
-		}
-		else if (prevY > nextY) {
-			for (int y = nextY; y <= prevY; y++) {
-				image.setRGB(x, y, rgb);
-			}
-		}
-		else {
-			for (int y = prevY; y <= nextY; y++) {
-				image.setRGB(x, y, rgb);
-			}
-		}
-	}
-
-	private static String leftPad(int number, int length) {
+	static String leftPad(int number, int length) {
 		StringBuilder result = new StringBuilder(String.valueOf(number));
 
 		while (result.length() < length) {
