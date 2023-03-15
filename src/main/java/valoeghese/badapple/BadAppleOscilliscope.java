@@ -58,7 +58,7 @@ public class BadAppleOscilliscope {
 
 		VideoOutput videoOutput = raw ?
 				new TextFileOutput(outputFolder.resolve("video.txt"), resolutionX, resolutionY) :
-				new BufferedImageOutput(outputFolder, resolutionX, resolutionY, spike ? resolutionY + 1 : resolutionY, 1);
+				new BufferedImageOutput(outputFolder, resolutionX, resolutionY, spike ? 1 : 0, 1);
 
 		try (ZipFile src = new ZipFile(args[0])) {
 			if (args.length == 4) {
@@ -163,9 +163,9 @@ public class BadAppleOscilliscope {
 			channel2[x] = eqYOut;
 		}
 
-		// if spike, override beginning of frame with spike to height. This is useful for aligning on the oscilliscope (trigger).
-		channel1[0] = out.getHeight();
-		channel2[0] = out.getHeight();
+		// if spike, override beginning of frame with spike out put range. This is useful for aligning on the oscilliscope (trigger).
+		channel1[0] = -1;
+		channel2[0] = -1;
 
 		// write the frame
 		out.writeFrame(channel1, channel2);

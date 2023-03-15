@@ -3,7 +3,6 @@ package valoeghese.badapple;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.OpenOption;
 import java.nio.file.Path;
 
 public class TextFileOutput extends VideoOutput {
@@ -24,7 +23,8 @@ public class TextFileOutput extends VideoOutput {
 		StringBuilder builder = new StringBuilder();
 
 		for (int x = 0; x < channel1.length; x++) {
-			builder.append(channel1[x]).append("\t").append(channel2[x]).append("\n");
+			builder.append(this.getHeight() - channel1[x]).append("\t")
+					.append(this.getHeight() - channel2[x]).append("\n");
 		}
 
 		this.writer.write(builder.toString());

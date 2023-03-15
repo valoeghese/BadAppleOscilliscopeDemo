@@ -13,20 +13,20 @@ import java.nio.file.Path;
 import static valoeghese.badapple.BadAppleOscilliscope.leftPad;
 
 public final class BufferedImageOutput extends VideoOutput {
-	public BufferedImageOutput(Path directory, int resolutionX, int resolutionY, int actualHeight, int startFrameNumber) {
+	public BufferedImageOutput(Path directory, int resolutionX, int resolutionY, int offset, int startFrameNumber) {
 		super(resolutionX, resolutionY);
 		this.directory = directory;
 		this.frameNumber = startFrameNumber;
-		this.actualHeight = actualHeight;
+		this.offset = offset;
 	}
 
 	private final Path directory;
-	private final int actualHeight;
+	private final int offset;
 	private int frameNumber;
 
 	@Override
 	public void writeFrame(int[] channel1, int[] channel2) throws IOException {
-		BufferedImage outputFrame = new BufferedImage(this.getWidth(), this.actualHeight, BufferedImage.TYPE_INT_RGB);
+		BufferedImage outputFrame = new BufferedImage(this.getWidth(), this.getHeight() + this.offset, BufferedImage.TYPE_INT_RGB);
 
 		// write black image
 		Graphics2D graphics2D = outputFrame.createGraphics();
@@ -38,10 +38,10 @@ public final class BufferedImageOutput extends VideoOutput {
 		int prevYCh2 = -1;
 
 		for (int x = 0; x < this.getWidth(); x++) {
-			drawVerticalLine(outputFrame, x, prevYCh1, channel1[x], Color.WHITE.getRGB());
+			drawVerticalLine(outputFrame, x, prevYCh1, channel1[x] + this.offset, Color.WHITE.getRGB());
 			prevYCh1 = channel1[x];
 
-			drawVerticalLine(outputFrame, x, prevYCh2, channel2[x], Color.YELLOW.getRGB());
+			drawVerticalLine(outputFrame, x, prevYCh2, channel2[x] + this.offset, Color.YELLOW.getRGB());
 			prevYCh2 = channel2[x];
 		}
 
