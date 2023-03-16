@@ -21,8 +21,8 @@ public class Bits8Output extends VideoOutput {
 	@Override
 	public void writeFrame(int[] channel1, int[] channel2) throws IOException {
 		for (int x = 0; x < channel1.length; x++) {
-			this.outputStream.writeByte(channel1[x] - 1);
-			this.outputStream.writeByte(channel2[x] - 1);
+			this.outputStream.writeByte(this.getHeight() - channel1[x] - 1);
+			this.outputStream.writeByte(this.getHeight() - channel2[x] - 1);
 		}
 	}
 
