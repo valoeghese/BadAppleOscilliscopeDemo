@@ -44,7 +44,7 @@ public class BadAppleOscilliscope {
 					}
 					mode = Mode.CH_2_INTERLACING;
 					break;
-				case "--mode=3p":
+				case "--mode=3x":
 					if (mode != null) {
 						System.err.println("You cannot specify the mode twice.");
 						System.exit(1);
