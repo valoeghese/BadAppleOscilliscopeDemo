@@ -19,6 +19,7 @@ public class BadAppleOscilliscope {
 		boolean flagRaw = false;
 		boolean flagRawBinary = false;
 		boolean flagSpike = false;
+		boolean noVert = false;
 
 		for (String s : args) {
 			if (s.startsWith("--")) {
@@ -31,6 +32,9 @@ public class BadAppleOscilliscope {
 					break;
 				case "--spike":
 					flagSpike = true;
+					break;
+				case "--novert":
+					noVert = true;
 					break;
 				default:
 					System.out.println("Unknown flag " + s);
@@ -47,12 +51,12 @@ public class BadAppleOscilliscope {
 			return;
 		}
 
-		run(nonFlagArgs.toArray(String[]::new), flagRawBinary ? 2 : (flagRaw ? 1 : 0), flagSpike);
+		run(nonFlagArgs.toArray(String[]::new), flagRawBinary ? 2 : (flagRaw ? 1 : 0), flagSpike, noVert);
 	}
 
-	public static void run(String[] args, int mode, boolean spike) throws IOException {
+	public static void run(String[] args, int mode, boolean spike, boolean noVert) throws IOException {
 		if (args.length != 3 && args.length != 4) {
-			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y> [debug frame] [--raw] [--spike]");
+			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y> [debug frame] [--raw/--rawb] [--spike] [--novert]");
 			return;
 		}
 
@@ -68,7 +72,7 @@ public class BadAppleOscilliscope {
 		VideoOutput videoOutput = switch (mode) {
 			case 2 -> new Bits8Output(outputFolder.resolve("video.dat"), resolutionX, resolutionY);
 			case 1 -> new TextFileOutput(outputFolder.resolve("video.txt"), resolutionX, resolutionY);
-			default -> new BufferedImageOutput(outputFolder, resolutionX, resolutionY, spike ? 1 : 0, 1);
+			default -> new BufferedImageOutput(outputFolder, resolutionX, resolutionY, spike ? 1 : 0, 1, noVert);
 		};
 
 		try (ZipFile src = new ZipFile(args[0])) {

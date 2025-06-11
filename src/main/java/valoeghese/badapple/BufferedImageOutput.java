@@ -13,15 +13,17 @@ import java.nio.file.Path;
 import static valoeghese.badapple.BadAppleOscilliscope.leftPad;
 
 public final class BufferedImageOutput extends VideoOutput {
-	public BufferedImageOutput(Path directory, int resolutionX, int resolutionY, int offset, int startFrameNumber) {
+	public BufferedImageOutput(Path directory, int resolutionX, int resolutionY, int offset, int startFrameNumber, boolean noVert) {
 		super(resolutionX, resolutionY);
 		this.directory = directory;
 		this.frameNumber = startFrameNumber;
 		this.offset = offset;
+		this.noVert = noVert;
 	}
 
 	private final Path directory;
 	private final int offset;
+	private final boolean noVert;
 	private int frameNumber;
 
 	@Override
@@ -38,10 +40,12 @@ public final class BufferedImageOutput extends VideoOutput {
 		int prevYCh2 = -1;
 
 		for (int x = 0; x < this.getWidth(); x++) {
-			drawVerticalLine(outputFrame, x, prevYCh1, channel1[x] + this.offset, Color.WHITE.getRGB());
+			int nextYWhite = channel1[x] + this.offset;
+			drawVerticalLine(outputFrame, x, this.noVert ? nextYWhite : prevYCh1, nextYWhite, Color.WHITE.getRGB());
 			prevYCh1 = channel1[x];
 
-			drawVerticalLine(outputFrame, x, prevYCh2, channel2[x] + this.offset, Color.YELLOW.getRGB());
+			int nextYYellow = channel2[x] + this.offset;
+			drawVerticalLine(outputFrame, x, this.noVert ? nextYYellow : prevYCh2, nextYYellow, Color.YELLOW.getRGB());
 			prevYCh2 = channel2[x];
 		}
 
