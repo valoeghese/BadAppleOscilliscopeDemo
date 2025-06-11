@@ -1,5 +1,7 @@
 package valoeghese.badapple;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -19,12 +21,20 @@ public class TextFileOutput extends VideoOutput {
 	private BufferedWriter writer;
 
 	@Override
-	public void writeFrame(int[] channel1, int[] channel2) throws IOException {
+	public void writeFrame(int[] channel1, int[] channel2, int @Nullable [] channel3) throws IOException {
 		StringBuilder builder = new StringBuilder();
 
-		for (int x = 0; x < channel1.length; x++) {
-			builder.append(this.getHeight() - channel1[x] - 1).append("\t")
-					.append(this.getHeight() - channel2[x] - 1).append("\n");
+		if (channel3 != null) {
+			for (int x = 0; x < channel1.length; x++) {
+				builder.append(this.getHeight() - channel1[x] - 1).append("\t")
+						.append(this.getHeight() - channel2[x] - 1).append("\t")
+						.append(this.getHeight() - channel3[x] - 1).append("\n");
+			}
+		} else {
+			for (int x = 0; x < channel1.length; x++) {
+				builder.append(this.getHeight() - channel1[x] - 1).append("\t")
+						.append(this.getHeight() - channel2[x] - 1).append("\n");
+			}
 		}
 
 		this.writer.write(builder.toString());

@@ -1,6 +1,7 @@
 package valoeghese.badapple;
 
 import java.io.IOException;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Writes two-channel video output of channel X by Y. Subclasses represent different methods of storing this video output.
@@ -26,9 +27,10 @@ public abstract class VideoOutput {
 	 * Write a frame of data to this output. The arrays for channel 1 and channel 2 are guaranteed to be the same length.
 	 * @param channel1 the data to write to channel 1.
 	 * @param channel2 the data to write to channel 2.
+	 * @param channel3 the data to write to channel 3. (optional)
 	 * @throws IOException if an IOException occurs during frame writing.
 	 */
-	public abstract void writeFrame(int[] channel1, int[] channel2) throws IOException;
+	public abstract void writeFrame(int[] channel1, int[] channel2, int @Nullable [] channel3) throws IOException;
 
 	/**
 	 * Called upon the end of the video output, to do anything that needs to be handled then, such as closing an output stream.

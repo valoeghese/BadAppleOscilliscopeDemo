@@ -1,5 +1,7 @@
 package valoeghese.badapple;
 
+import org.jetbrains.annotations.Nullable;
+
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -27,7 +29,7 @@ public final class BufferedImageOutput extends VideoOutput {
 	private int frameNumber;
 
 	@Override
-	public void writeFrame(int[] channel1, int[] channel2) throws IOException {
+	public void writeFrame(int[] channel1, int[] channel2, int @Nullable [] channel3) throws IOException {
 		BufferedImage outputFrame = new BufferedImage(this.getWidth(), this.getHeight() + this.offset, BufferedImage.TYPE_INT_RGB);
 
 		// write black image
@@ -38,15 +40,22 @@ public final class BufferedImageOutput extends VideoOutput {
 		// for continuous line
 		int prevYCh1 = -1;
 		int prevYCh2 = -1;
+		int prevYCh3 = -1;
 
 		for (int x = 0; x < this.getWidth(); x++) {
 			int nextYWhite = channel1[x] + this.offset;
 			drawVerticalLine(outputFrame, x, this.noVert ? nextYWhite : prevYCh1, nextYWhite, Color.WHITE.getRGB());
-			prevYCh1 = channel1[x];
+			prevYCh1 = channel1[x]; // note to self: why does this not have +offset too? Issue? Pretty sure I would have commented why
 
 			int nextYYellow = channel2[x] + this.offset;
 			drawVerticalLine(outputFrame, x, this.noVert ? nextYYellow : prevYCh2, nextYYellow, Color.YELLOW.getRGB());
 			prevYCh2 = channel2[x];
+
+			if (channel3 != null) {
+				int nextYBlue = channel3[x] + this.offset;
+				drawVerticalLine(outputFrame, x, this.noVert ? nextYBlue : prevYCh3, nextYBlue, Color.CYAN.getRGB());
+				prevYCh3 = channel3[x];
+			}
 		}
 
 		// write

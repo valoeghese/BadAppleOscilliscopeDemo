@@ -20,6 +20,7 @@ public class BadAppleOscilliscope {
 		boolean flagRawBinary = false;
 		boolean flagSpike = false;
 		boolean noVert = false;
+		Mode mode = null;
 
 		for (String s : args) {
 			if (s.startsWith("--")) {
@@ -36,6 +37,20 @@ public class BadAppleOscilliscope {
 				case "--novert":
 					noVert = true;
 					break;
+				case "--mode=2i":
+					if (mode != null) {
+						System.err.println("You cannot specify the mode twice.");
+						System.exit(1);
+					}
+					mode = Mode.CH_2_INTERLACING;
+					break;
+				case "--mode=3p":
+					if (mode != null) {
+						System.err.println("You cannot specify the mode twice.");
+						System.exit(1);
+					}
+					mode = Mode.CH_3_NO_INTERLACE;
+					break;
 				default:
 					System.out.println("Unknown flag " + s);
 					return;
@@ -46,17 +61,27 @@ public class BadAppleOscilliscope {
 			}
 		}
 
+		if (mode == null) {
+			mode = Mode.CH_2_INTERLACING; // default
+		}
+
 		if (flagRawBinary && flagRaw) {
 			System.out.println("Cannot specify both raw binary and raw (text).");
 			return;
 		}
 
-		run(nonFlagArgs.toArray(String[]::new), flagRawBinary ? 2 : (flagRaw ? 1 : 0), flagSpike, noVert);
+		run(nonFlagArgs.toArray(String[]::new), flagRawBinary ? 2 : (flagRaw ? 1 : 0), flagSpike, noVert, mode);
 	}
 
-	public static void run(String[] args, int mode, boolean spike, boolean noVert) throws IOException {
+	public enum Mode {
+		CH_2_INTERLACING,
+		CH_3_NO_INTERLACE
+	}
+
+	public static void run(String[] args, int exportType, boolean spike, boolean noVert, Mode channelMode) throws IOException {
 		if (args.length != 3 && args.length != 4) {
-			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y> [debug frame] [--raw/--rawb] [--spike] [--novert]");
+			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y> [debug frame] [--raw/--rawb] [--mode=...] [--spike] [--novert]");
+			System.out.println("   Modes: (--mode=2i [DEFAULT] 2 channel, interlacing) (--mode=3x) 3 channel, no interlacing");
 			return;
 		}
 
@@ -69,7 +94,7 @@ public class BadAppleOscilliscope {
 		int resolutionX = Integer.parseInt(args[1]);
 		int resolutionY = Integer.parseInt(args[2]);
 
-		VideoOutput videoOutput = switch (mode) {
+		VideoOutput videoOutput = switch (exportType) {
 			case 2 -> new Bits8Output(outputFolder.resolve("video.dat"), resolutionX, resolutionY);
 			case 1 -> new TextFileOutput(outputFolder.resolve("video.txt"), resolutionX, resolutionY);
 			default -> new BufferedImageOutput(outputFolder, resolutionX, resolutionY, spike ? 1 : 0, 1, noVert);
@@ -77,13 +102,13 @@ public class BadAppleOscilliscope {
 
 		try (ZipFile src = new ZipFile(args[0])) {
 			if (args.length == 4) {
-				processFrame(Integer.parseInt(args[3]), src, videoOutput, spike);
+				processFrame(Integer.parseInt(args[3]), src, videoOutput, spike, channelMode);
 			}
 			else {
 				int i = 1;
 				long time = System.currentTimeMillis();
 
-				while (processFrame(i, src, videoOutput, spike)) {
+				while (processFrame(i, src, videoOutput, spike, channelMode)) {
 					if (i % 100 == 0) {
 						System.out.println("Completed " + i + " frames");
 					}
@@ -99,7 +124,7 @@ public class BadAppleOscilliscope {
 		videoOutput.close();
 	}
 
-	private static boolean processFrame(int i, ZipFile src, VideoOutput output, boolean spike) throws IOException {
+	private static boolean processFrame(int i, ZipFile src, VideoOutput output, boolean spike, Mode channelMode) throws IOException {
 		String id = leftPad(i, 4);
 		ZipEntry entry = src.getEntry("frames/output_" + id + ".jpg");
 
@@ -113,11 +138,29 @@ public class BadAppleOscilliscope {
 			frame = ImageIO.read(stream);
 		}
 
-		detectEdges(frame, output, i & 1, spike);
+		EdgeResult edges, secondEdges;
+
+		switch (channelMode) {
+		case CH_2_INTERLACING:
+			// write the frame
+			edges = detectEdges(frame, output, i & 1, spike);
+			output.writeFrame(edges.bottom, edges.top, null);
+			break;
+		case CH_3_NO_INTERLACE:
+			// write the frame
+			edges = detectEdges(frame, output, 0, spike);
+			secondEdges = detectEdges(frame, output, 1, spike);
+			output.writeFrame(edges.bottom, edges.top, secondEdges.top);
+			break;
+		}
+
 		return true;
 	}
 
-	public static void detectEdges(BufferedImage in, VideoOutput out, int skip, boolean spike) throws IOException {
+	public record EdgeResult(int[] bottom, int[] top) {
+	}
+
+	public static EdgeResult detectEdges(BufferedImage in, VideoOutput out, int skip, boolean spike) throws IOException {
 		final int horizontalResolution = out.getWidth();
 
 		// create output channels
@@ -179,11 +222,12 @@ public class BadAppleOscilliscope {
 		}
 
 		// if spike, override beginning of frame with spike out put range. This is useful for aligning on the oscilliscope (trigger).
-		channel1[0] = -1;
-		channel2[0] = -1;
+		if (spike) {
+			channel1[0] = -1;
+			channel2[0] = -1;
+		}
 
-		// write the frame
-		out.writeFrame(channel1, channel2);
+		return new EdgeResult(channel1, channel2);
 	}
 
 	static String leftPad(int number, int length) {
