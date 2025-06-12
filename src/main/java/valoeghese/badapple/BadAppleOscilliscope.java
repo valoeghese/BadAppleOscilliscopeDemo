@@ -21,6 +21,7 @@ public class BadAppleOscilliscope {
 		boolean flagSpike = false;
 		boolean noVert = false;
 		Mode mode = null;
+		Threshold threshold = null;
 
 		for (String s : args) {
 			if (s.startsWith("--")) {
@@ -58,6 +59,20 @@ public class BadAppleOscilliscope {
 					}
 					mode = Mode.CH_4_NO_INTERLACE;
 					break;
+				case "--threshold=hysteretic":
+					if (threshold != null) {
+						System.err.println("You cannot specify the threshold twice.");
+						System.exit(1);
+					}
+					threshold = Threshold.THRESHOLD_HYSTERETIC;
+					break;
+				case "--threshold=white":
+					if (threshold != null) {
+						System.err.println("You cannot specify the threshold twice.");
+						System.exit(1);
+					}
+					threshold = Threshold.THRESHOLD_WHITE;
+					break;
 				default:
 					System.out.println("Unknown flag " + s);
 					return;
@@ -71,13 +86,16 @@ public class BadAppleOscilliscope {
 		if (mode == null) {
 			mode = Mode.CH_2_INTERLACING; // default
 		}
+		if (threshold == null) {
+			threshold = Threshold.THRESHOLD_HYSTERETIC; // default
+		}
 
 		if (flagRawBinary && flagRaw) {
 			System.out.println("Cannot specify both raw binary and raw (text).");
 			return;
 		}
 
-		run(nonFlagArgs.toArray(String[]::new), flagRawBinary ? 2 : (flagRaw ? 1 : 0), flagSpike, noVert, mode);
+		run(nonFlagArgs.toArray(String[]::new), flagRawBinary ? 2 : (flagRaw ? 1 : 0), flagSpike, noVert, mode, threshold);
 	}
 
 	public enum Mode {
@@ -85,11 +103,38 @@ public class BadAppleOscilliscope {
 		CH_3_NO_INTERLACE,
 		CH_4_NO_INTERLACE
 	}
+	public enum Threshold {
+		// new thresholding
+		THRESHOLD_HYSTERETIC {
+			@Override
+			boolean threshold(int rgba, boolean current, boolean first) {
+				// greyscale image: just take the blue
+				int grey = (rgba >> 8) & 0xFF;
+				if (first) return grey > 127; // first colour
+				if (current) return grey > 10;// last white: need low brightness to switch to black
+				return grey > 250;//last black: need high brightness to switch
+			}
+		},
+		// old thresholding
+		THRESHOLD_WHITE {
+			@Override
+			boolean threshold(int rgba, boolean current, boolean first) {
+				return rgba == -1;
+			}
+		};
 
-	public static void run(String[] args, int exportType, boolean spike, boolean noVert, Mode channelMode) throws IOException {
+		/**
+		 * Return true for white, false for black
+		 */
+		abstract boolean threshold(int rgba, boolean current, boolean first);
+	}
+
+	public static void run(String[] args, int exportType, boolean spike, boolean noVert, Mode channelMode,
+						   Threshold threshold) throws IOException {
 		if (args.length != 3 && args.length != 4) {
-			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y> [debug frame] [--raw/--rawb] [--mode=...] [--spike] [--novert]");
+			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y> [debug frame] [--raw/--rawb] [--mode=...] [--threshold=...] [--spike] [--novert]");
 			System.out.println("   Modes: (--mode=2i [DEFAULT] 2 channel, interlacing) (--mode=3x 3 channel, no interlacing) (--mode=4x 4 channel, no interlacing)");
+			System.out.println("   Thresholds: (--threshold=hysteretic [DEFAULT] large hysteresis) (--threshold=white split image into white and not white)");
 			return;
 		}
 
@@ -110,13 +155,13 @@ public class BadAppleOscilliscope {
 
 		try (ZipFile src = new ZipFile(args[0])) {
 			if (args.length == 4) {
-				processFrame(Integer.parseInt(args[3]), src, videoOutput, spike, channelMode);
+				processFrame(Integer.parseInt(args[3]), src, videoOutput, spike, channelMode, threshold);
 			}
 			else {
 				int i = 1;
 				long time = System.currentTimeMillis();
 
-				while (processFrame(i, src, videoOutput, spike, channelMode)) {
+				while (processFrame(i, src, videoOutput, spike, channelMode, threshold)) {
 					if (i % 100 == 0) {
 						System.out.println("Completed " + i + " frames");
 					}
@@ -132,7 +177,8 @@ public class BadAppleOscilliscope {
 		videoOutput.close();
 	}
 
-	private static boolean processFrame(int i, ZipFile src, VideoOutput output, boolean spike, Mode channelMode) throws IOException {
+	private static boolean processFrame(int i, ZipFile src, VideoOutput output, boolean spike, Mode channelMode,
+										Threshold threshold) throws IOException {
 		String id = leftPad(i, 4);
 		ZipEntry entry = src.getEntry("frames/output_" + id + ".jpg");
 
@@ -151,21 +197,21 @@ public class BadAppleOscilliscope {
 		switch (channelMode) {
 		case CH_2_INTERLACING:
 			// write the frame
-			edges = detectEdges(frame, output, i & 1, spike);
+			edges = detectEdges(frame, output, threshold, i & 1, spike);
 			output.writeFrame(edges.bottom, edges.top, null);
 			break;
 		case CH_3_NO_INTERLACE:
 			// write the frame
-			edges = detectEdges(frame, output, 0, spike);
-			secondEdges = detectEdges(frame, output, 1, spike);
+			edges = detectEdges(frame, output, threshold, 0, spike);
+			secondEdges = detectEdges(frame, output, threshold, 1, spike);
 
 			// if ch3 value is larger (lower) than bottom clamp ch3 to bottom!
 			output.writeFrame(edges.bottom, edges.top, ArrayMaths.clampMax(secondEdges.top, edges.bottom));
 			break;
 		case CH_4_NO_INTERLACE:
 			// write the frame
-			edges = detectEdges(frame, output, 0, spike);
-			secondEdges = detectEdges(frame, output, 1, spike);
+			edges = detectEdges(frame, output, threshold, 0, spike);
+			secondEdges = detectEdges(frame, output, threshold, 1, spike);
 
 			// if ch4 value is smaller (higher) than top clamp ch4 to top!
 			output.writeFrame(edges.bottom, edges.top, ArrayMaths.clampMax(secondEdges.top, edges.bottom), ArrayMaths.clampMin(secondEdges.bottom, edges.top));
@@ -178,7 +224,7 @@ public class BadAppleOscilliscope {
 	public record EdgeResult(int[] bottom, int[] top) {
 	}
 
-	public static EdgeResult detectEdges(BufferedImage in, VideoOutput out, int skip, boolean spike) throws IOException {
+	public static EdgeResult detectEdges(BufferedImage in, VideoOutput out, Threshold threshold, int skip, boolean spike) throws IOException {
 		final int horizontalResolution = out.getWidth();
 
 		// create output channels
@@ -195,10 +241,10 @@ public class BadAppleOscilliscope {
 			int passes = skip;
 
 			int y;
-			boolean current = reduce(in.getRGB(eqXIn, in.getHeight() - 1));
+			boolean current = threshold.threshold(in.getRGB(eqXIn, in.getHeight() - 1), false, true);
 
 			for (y = in.getHeight() - 1; y >= 0; y--) {
-				if (reduce(in.getRGB(eqXIn, y)) != current) {
+				if (threshold.threshold(in.getRGB(eqXIn, y), current, false) != current) {
 					current = !current;
 
 					// when passes was 0 exit. That is, tolerate <passes> number of edges before exiting.
@@ -218,10 +264,10 @@ public class BadAppleOscilliscope {
 			// Upper Edge
 			//=================
 			passes = skip;
-			current = reduce(in.getRGB(eqXIn, 0));
+			current = threshold.threshold(in.getRGB(eqXIn, 0), false, true);
 
 			for (y = 0; y < in.getHeight(); y++) {
-				if (reduce(in.getRGB(eqXIn, y)) != current) {
+				if (threshold.threshold(in.getRGB(eqXIn, y), current, false) != current) {
 					current = !current;
 
 					// when passes was 0 exit. That is, tolerate <passes> number of edges before exiting.
@@ -256,14 +302,5 @@ public class BadAppleOscilliscope {
 		}
 
 		return result.toString();
-	}
-
-	/**
-	 * Reduce a colour in the full rgb spectrum to two 'colours', represented as a boolean.
-	 * @param rgbColour the rgb colour.
-	 * @return the boolean colour representation.
-	 */
-	private static boolean reduce(int rgbColour) {
-		return rgbColour == -1;
 	}
 }
