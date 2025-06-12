@@ -21,19 +21,15 @@ public class TextFileOutput extends VideoOutput {
 	private BufferedWriter writer;
 
 	@Override
-	public void writeFrame(int[] channel1, int[] channel2, int @Nullable [] channel3) throws IOException {
+	public void writeFrame(int[] ...channels) throws IOException {
 		StringBuilder builder = new StringBuilder();
+		final int len = channels[0].length;
+		final int[] lastChannel = channels[channels.length-1];
 
-		if (channel3 != null) {
-			for (int x = 0; x < channel1.length; x++) {
-				builder.append(this.getHeight() - channel1[x] - 1).append("\t")
-						.append(this.getHeight() - channel2[x] - 1).append("\t")
-						.append(this.getHeight() - channel3[x] - 1).append("\n");
-			}
-		} else {
-			for (int x = 0; x < channel1.length; x++) {
-				builder.append(this.getHeight() - channel1[x] - 1).append("\t")
-						.append(this.getHeight() - channel2[x] - 1).append("\n");
+		for (int x = 0; x < len; x++) {
+			for (int[] channel : channels) {
+				builder.append(this.getHeight() - channel[x] - 1)
+						.append(channel == lastChannel ? '\n' : '\t');
 			}
 		}
 

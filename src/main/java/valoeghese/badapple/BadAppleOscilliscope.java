@@ -51,6 +51,13 @@ public class BadAppleOscilliscope {
 					}
 					mode = Mode.CH_3_NO_INTERLACE;
 					break;
+				case "--mode=4x":
+					if (mode != null) {
+						System.err.println("You cannot specify the mode twice.");
+						System.exit(1);
+					}
+					mode = Mode.CH_4_NO_INTERLACE;
+					break;
 				default:
 					System.out.println("Unknown flag " + s);
 					return;
@@ -75,13 +82,14 @@ public class BadAppleOscilliscope {
 
 	public enum Mode {
 		CH_2_INTERLACING,
-		CH_3_NO_INTERLACE
+		CH_3_NO_INTERLACE,
+		CH_4_NO_INTERLACE
 	}
 
 	public static void run(String[] args, int exportType, boolean spike, boolean noVert, Mode channelMode) throws IOException {
 		if (args.length != 3 && args.length != 4) {
 			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y> [debug frame] [--raw/--rawb] [--mode=...] [--spike] [--novert]");
-			System.out.println("   Modes: (--mode=2i [DEFAULT] 2 channel, interlacing) (--mode=3x) 3 channel, no interlacing");
+			System.out.println("   Modes: (--mode=2i [DEFAULT] 2 channel, interlacing) (--mode=3x 3 channel, no interlacing) (--mode=4x 4 channel, no interlacing)");
 			return;
 		}
 
@@ -153,6 +161,14 @@ public class BadAppleOscilliscope {
 
 			// if ch3 value is larger (lower) than bottom clamp ch3 to bottom!
 			output.writeFrame(edges.bottom, edges.top, ArrayMaths.clampMax(secondEdges.top, edges.bottom));
+			break;
+		case CH_4_NO_INTERLACE:
+			// write the frame
+			edges = detectEdges(frame, output, 0, spike);
+			secondEdges = detectEdges(frame, output, 1, spike);
+
+			// if ch4 value is smaller (higher) than top clamp ch4 to top!
+			output.writeFrame(edges.bottom, edges.top, ArrayMaths.clampMax(secondEdges.top, edges.bottom), ArrayMaths.clampMin(secondEdges.bottom, edges.top));
 			break;
 		}
 

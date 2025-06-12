@@ -21,18 +21,11 @@ public class Bits8Output extends VideoOutput {
 	private DataOutputStream outputStream;
 
 	@Override
-	public void writeFrame(int[] channel1, int[] channel2, int @Nullable [] channel3) throws IOException {
-		if (channel3 != null) {
-			for (int x = 0; x < channel1.length; x++) {
-				this.outputStream.writeByte(this.getHeight() - channel1[x] - 1);
-				this.outputStream.writeByte(this.getHeight() - channel2[x] - 1);
-				this.outputStream.writeByte(this.getHeight() - channel3[x] - 1);
-			}
-		} else {
-			for (int x = 0; x < channel1.length; x++) {
-				this.outputStream.writeByte(this.getHeight() - channel1[x] - 1);
-				this.outputStream.writeByte(this.getHeight() - channel2[x] - 1);
-			}
+	public void writeFrame(int[] ...channels) throws IOException {
+		for (int x = 0; x < channels[0].length; x++) {
+            for (int[] channel : channels) {
+                this.outputStream.writeByte(this.getHeight() - channel[x] - 1);
+            }
 		}
 	}
 
