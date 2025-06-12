@@ -99,9 +99,19 @@ public class BadAppleOscilliscope {
 	}
 
 	public enum Mode {
-		CH_2_INTERLACING,
-		CH_3_NO_INTERLACE,
-		CH_4_NO_INTERLACE
+		CH_2_INTERLACING("2-channel interlacing"),
+		CH_3_NO_INTERLACE("3-channel no interlacing"),
+		CH_4_NO_INTERLACE("4-channel no interlacing");
+
+		Mode(String name) {
+			this.name = name;
+		}
+		private final String name;
+
+		@Override
+		public String toString() {
+			return this.name;
+		}
 	}
 	public enum Threshold {
 		// new thresholding
@@ -137,6 +147,11 @@ public class BadAppleOscilliscope {
 			System.out.println("   Thresholds: (--threshold=hysteretic [DEFAULT] large hysteresis) (--threshold=white split image into white and not white)");
 			return;
 		}
+
+		System.out.println("%% BadAppleOscilloscope %%");
+		System.out.println(" > Export Type: " + (exportType == 0 ? "Video" : exportType == 1 ? "Raw (text)" : "Raw (binary)"));
+		System.out.println(" > Channels: " + channelMode);
+		System.out.println(" > Threshold: " + threshold.name());
 
 		Path outputFolder = Path.of(args[0]).toAbsolutePath().getParent().resolve("out");
 		try {
