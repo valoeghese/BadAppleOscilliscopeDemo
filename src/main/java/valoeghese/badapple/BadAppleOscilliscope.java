@@ -5,7 +5,6 @@ import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Array;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -152,8 +151,8 @@ public class BadAppleOscilliscope {
 			edges = detectEdges(frame, output, 0, spike);
 			secondEdges = detectEdges(frame, output, 1, spike);
 
-			// if bottom value is smaller (higher) clamp ch3 to that cause bottom trace should be lowest!
-			output.writeFrame(edges.bottom, edges.top, ArrayMaths.clampMin(secondEdges.top, edges.bottom));
+			// if ch3 value is larger (lower) than bottom clamp ch3 to bottom!
+			output.writeFrame(edges.bottom, edges.top, ArrayMaths.clampMax(secondEdges.top, edges.bottom));
 			break;
 		}
 
