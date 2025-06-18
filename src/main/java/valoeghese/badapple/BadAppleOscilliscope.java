@@ -66,6 +66,20 @@ public class BadAppleOscilliscope {
 					}
 					mode = Mode.CH_4_NO_INTERLACE;
 					break;
+				case "--mode=4pi6":
+					if (mode != null) {
+						System.err.println("You cannot specify the mode twice.");
+						System.exit(1);
+					}
+					mode = Mode.CH_4_PIXEL_INTERLACE_6;
+					break;
+				case "--mode=4pi8":
+					if (mode != null) {
+						System.err.println("You cannot specify the mode twice.");
+						System.exit(1);
+					}
+					mode = Mode.CH_4_PIXEL_INTERLACE_8;
+					break;
 				case "--threshold=hysteretic":
 					if (threshold != null) {
 						System.err.println("You cannot specify the threshold twice.");
@@ -109,7 +123,9 @@ public class BadAppleOscilliscope {
 		CH_2_INTERLACING("2-channel interlacing"),
 		CH_2_PIXEL_INTERLACE_8("2-channel pixel-interlace (8 edges)"),
 		CH_3_NO_INTERLACE("3-channel no interlacing"),
-		CH_4_NO_INTERLACE("4-channel no interlacing");
+		CH_4_NO_INTERLACE("4-channel no interlacing"),
+		CH_4_PIXEL_INTERLACE_6("4-channel pixel-interlace (6 edges)"),
+		CH_4_PIXEL_INTERLACE_8("4-channel pixel-interlace (8 edges)");
 
 		Mode(String name) {
 			this.name = name;
@@ -152,6 +168,7 @@ public class BadAppleOscilliscope {
 		if (args.length != 3 && args.length != 4) {
 			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y> [debug frame] [--raw/--rawb] [--mode=...] [--threshold=...] [--spike] [--novert]");
 			System.out.println("   Modes: (--mode=2i [DEFAULT] 2 channel, interlacing) (--mode=2pi8 2 channel, pixel interlace, 8 edges) (--mode=3x 3 channel, no interlacing) (--mode=4x 4 channel, no interlacing)");
+			System.out.println("          (--mode=4pi6 4 channel, pixel interlace, 6 edges) (--mode=4pi8 4 channel, pixel interlace, 8 edges)");
 			System.out.println("   Thresholds: (--threshold=hysteretic [DEFAULT] large hysteresis) (--threshold=white split image into white and not white)");
 			return;
 		}
@@ -216,6 +233,9 @@ public class BadAppleOscilliscope {
 			frame = ImageIO.read(stream);
 		}
 
+		// in smaller outputs this is the same as output.getHeight() - 1
+		int bottom = (int)(((double)output.getHeight()/frame.getHeight()) * (frame.getHeight() - 1));
+
 		EdgeResult edges, secondEdges;
 
 		switch (channelMode) {
@@ -230,9 +250,6 @@ public class BadAppleOscilliscope {
 		{
 			EdgeResult thirdEdges = detectEdges(frame, output, threshold, 2, spike);
 			EdgeResult fourthEdges = detectEdges(frame, output, threshold, 3, spike);
-
-			// in smaller outputs this is the same as output.getHeight() - 1
-			int bottom = (int)(((double)output.getHeight()/frame.getHeight()) * (frame.getHeight() - 1));
 
 			pixelInterlace(bottom + 1, edges.top, edges.bottom, secondEdges.top, secondEdges.bottom, thirdEdges.top, thirdEdges.bottom, fourthEdges.top, fourthEdges.bottom);
 			output.writeFrame(edges.bottom, edges.top);
@@ -253,6 +270,34 @@ public class BadAppleOscilliscope {
 
 			// if ch4 value is smaller (higher) than top clamp ch4 to top!
 			output.writeFrame(edges.bottom, edges.top, ArrayMaths.clampMax(secondEdges.top, edges.bottom), ArrayMaths.clampMin(secondEdges.bottom, edges.top));
+			break;
+		case CH_4_PIXEL_INTERLACE_6:
+			edges = detectEdges(frame, output, threshold, 0, spike);
+			secondEdges = detectEdges(frame, output, threshold, 1, spike);
+		{
+			EdgeResult thirdEdges = detectEdges(frame, output, threshold, 2, spike);
+
+			ArrayMaths.clampMax(secondEdges.top, edges.bottom);
+			ArrayMaths.clampMin(secondEdges.bottom, edges.top);
+
+			pixelInterlace(bottom + 1, secondEdges.top, secondEdges.bottom, thirdEdges.top, thirdEdges.bottom);
+			output.writeFrame(edges.bottom, edges.top, secondEdges.top, secondEdges.bottom);
+		}
+			break;
+		case CH_4_PIXEL_INTERLACE_8:
+			edges = detectEdges(frame, output, threshold, 0, spike);
+			secondEdges = detectEdges(frame, output, threshold, 1, spike);
+		{
+			EdgeResult thirdEdges = detectEdges(frame, output, threshold, 2, spike);
+			EdgeResult fourthEdges = detectEdges(frame, output, threshold, 3, spike);
+
+			ArrayMaths.clampMax(secondEdges.top, edges.bottom);
+			ArrayMaths.clampMin(secondEdges.bottom, edges.top);
+
+			pixelInterlace(bottom + 1, edges.top, edges.bottom, thirdEdges.top, thirdEdges.bottom);
+			pixelInterlace(bottom + 1, secondEdges.top, secondEdges.bottom, fourthEdges.top, fourthEdges.bottom);
+			output.writeFrame(edges.bottom, edges.top, secondEdges.top, secondEdges.bottom);
+		}
 			break;
 		}
 
