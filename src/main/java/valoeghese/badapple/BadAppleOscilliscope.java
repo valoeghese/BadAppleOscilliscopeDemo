@@ -231,7 +231,10 @@ public class BadAppleOscilliscope {
 			EdgeResult thirdEdges = detectEdges(frame, output, threshold, 2, spike);
 			EdgeResult fourthEdges = detectEdges(frame, output, threshold, 3, spike);
 
-			pixelInterlace(edges.top, edges.bottom, secondEdges.top, secondEdges.bottom, thirdEdges.top, thirdEdges.bottom, fourthEdges.top, fourthEdges.bottom);
+			// in smaller outputs this is the same as output.getHeight() - 1
+			int bottom = (int)(((double)output.getHeight()/frame.getHeight()) * (frame.getHeight() - 1));
+
+			pixelInterlace(bottom + 1, edges.top, edges.bottom, secondEdges.top, secondEdges.bottom, thirdEdges.top, thirdEdges.bottom, fourthEdges.top, fourthEdges.bottom);
 			output.writeFrame(edges.bottom, edges.top);
 		}
 			break;
@@ -256,7 +259,7 @@ public class BadAppleOscilliscope {
 		return true;
 	}
 
-	private static void pixelInterlace(int[] top, int[] bottom, int[] ...alternating) {
+	private static void pixelInterlace(int height, int[] top, int[] bottom, int[] ...alternating) {
 		int depth = (alternating.length+1) / 2;
 		for (int x = 0; x < top.length; x++) {
 			int colDepth = x % (depth+1);
@@ -267,17 +270,22 @@ public class BadAppleOscilliscope {
 				int inDepth = (dh+2)/2;
 				if (inDepth > colDepth) break; // Don't go deeper than we have to
 				int v = alternating[dh][x];
-				if ((dh & 1)==1) {// bottom edge
-					if (v > top[x]) {
-						bottom[x] = v;
-					} else if ((inDepth & 1) == 0) {
-						bottom[x] = b;//prioritise the outer edges
-					}
-				} else {
-					if (v < bottom[x]) {
-						top[x] = v;
+
+				// b/c detect-edges locks to bottom when no edge exists for all channels
+				// might be better to have it spit out -1 and have the mode determine how to deal with it
+				if (v != height-1) {
+					if ((dh & 1) == 1) {// bottom edge
+						if (v > top[x]) {
+							bottom[x] = v;
+						} else if ((colDepth & 1) == 0) {
+							bottom[x] = b;//prioritise the outer edges
+						}
 					} else {
-						top[x] = t;//prioritise the outer edges
+						if (v < bottom[x]) {
+							top[x] = v;
+						} else {
+							top[x] = t;//prioritise the outer edges
+						}
 					}
 				}
 			}
