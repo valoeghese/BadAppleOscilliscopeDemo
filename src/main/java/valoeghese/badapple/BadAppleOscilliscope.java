@@ -45,6 +45,13 @@ public class BadAppleOscilliscope {
 					}
 					mode = Mode.CH_2_INTERLACING;
 					break;
+				case "--mode=2pi8":
+					if (mode != null) {
+						System.err.println("You cannot specify the mode twice.");
+						System.exit(1);
+					}
+					mode = Mode.CH_2_PIXEL_INTERLACE_8;
+					break;
 				case "--mode=3x":
 					if (mode != null) {
 						System.err.println("You cannot specify the mode twice.");
@@ -100,6 +107,7 @@ public class BadAppleOscilliscope {
 
 	public enum Mode {
 		CH_2_INTERLACING("2-channel interlacing"),
+		CH_2_PIXEL_INTERLACE_8("2-channel pixel-interlace (8 edges)"),
 		CH_3_NO_INTERLACE("3-channel no interlacing"),
 		CH_4_NO_INTERLACE("4-channel no interlacing");
 
@@ -143,7 +151,7 @@ public class BadAppleOscilliscope {
 						   Threshold threshold) throws IOException {
 		if (args.length != 3 && args.length != 4) {
 			System.out.println("Usage: badappleosc <file> <output resolution x> <output resolution y> [debug frame] [--raw/--rawb] [--mode=...] [--threshold=...] [--spike] [--novert]");
-			System.out.println("   Modes: (--mode=2i [DEFAULT] 2 channel, interlacing) (--mode=3x 3 channel, no interlacing) (--mode=4x 4 channel, no interlacing)");
+			System.out.println("   Modes: (--mode=2i [DEFAULT] 2 channel, interlacing) (--mode=2pi8 2 channel, pixel interlace, 8 edges) (--mode=3x 3 channel, no interlacing) (--mode=4x 4 channel, no interlacing)");
 			System.out.println("   Thresholds: (--threshold=hysteretic [DEFAULT] large hysteresis) (--threshold=white split image into white and not white)");
 			return;
 		}
@@ -152,6 +160,7 @@ public class BadAppleOscilliscope {
 		System.out.println(" > Export Type: " + (exportType == 0 ? "Video" : exportType == 1 ? "Raw (text)" : "Raw (binary)"));
 		System.out.println(" > Channels: " + channelMode);
 		System.out.println(" > Threshold: " + threshold.name());
+		if (spike) System.out.println(" > Spike Enabled");
 
 		Path outputFolder = Path.of(args[0]).toAbsolutePath().getParent().resolve("out");
 		try {
@@ -213,7 +222,18 @@ public class BadAppleOscilliscope {
 		case CH_2_INTERLACING:
 			// write the frame
 			edges = detectEdges(frame, output, threshold, i & 1, spike);
-			output.writeFrame(edges.bottom, edges.top, null);
+			output.writeFrame(edges.bottom, edges.top);
+			break;
+		case CH_2_PIXEL_INTERLACE_8:
+			edges = detectEdges(frame, output, threshold, 0, spike);
+			secondEdges = detectEdges(frame, output, threshold, 1, spike);
+		{
+			EdgeResult thirdEdges = detectEdges(frame, output, threshold, 2, spike);
+			EdgeResult fourthEdges = detectEdges(frame, output, threshold, 3, spike);
+
+			pixelInterlace(edges.top, edges.bottom, secondEdges.top, secondEdges.bottom, thirdEdges.top, thirdEdges.bottom, fourthEdges.top, fourthEdges.bottom);
+			output.writeFrame(edges.bottom, edges.top);
+		}
 			break;
 		case CH_3_NO_INTERLACE:
 			// write the frame
@@ -234,6 +254,34 @@ public class BadAppleOscilliscope {
 		}
 
 		return true;
+	}
+
+	private static void pixelInterlace(int[] top, int[] bottom, int[] ...alternating) {
+		int depth = (alternating.length+1) / 2;
+		for (int x = 0; x < top.length; x++) {
+			int colDepth = x % (depth+1);
+			int b = bottom[x];
+			int t = top[x];
+
+			for (int dh = 0; dh < alternating.length; dh++) {
+				int inDepth = (dh+2)/2;
+				if (inDepth > colDepth) break; // Don't go deeper than we have to
+				int v = alternating[dh][x];
+				if ((dh & 1)==1) {// bottom edge
+					if (v > top[x]) {
+						bottom[x] = v;
+					} else if ((inDepth & 1) == 0) {
+						bottom[x] = b;//prioritise the outer edges
+					}
+				} else {
+					if (v < bottom[x]) {
+						top[x] = v;
+					} else {
+						top[x] = t;//prioritise the outer edges
+					}
+				}
+			}
+		}
 	}
 
 	public record EdgeResult(int[] bottom, int[] top) {
