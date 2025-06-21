@@ -173,11 +173,11 @@ public class BadAppleOscilliscope {
 			return;
 		}
 
-		System.out.println("%% BadAppleOscilloscope %%");
-		System.out.println(" > Export Type: " + (exportType == 0 ? "Video" : exportType == 1 ? "Raw (text)" : "Raw (binary)"));
-		System.out.println(" > Channels: " + channelMode);
-		System.out.println(" > Threshold: " + threshold.name());
-		if (spike) System.out.println(" > Spike Enabled");
+		System.out.println("%% BadApple~~Oscilloscope~~ Console! %%");
+//		System.out.println(" > Export Type: " + (exportType == 0 ? "Video" : exportType == 1 ? "Raw (text)" : "Raw (binary)"));
+//		System.out.println(" > Channels: " + channelMode);
+//		System.out.println(" > Threshold: " + threshold.name());
+//		if (spike) System.out.println(" > Spike Enabled");
 
 		Path outputFolder = Path.of(args[0]).toAbsolutePath().getParent().resolve("out");
 		try {
@@ -188,11 +188,12 @@ public class BadAppleOscilliscope {
 		int resolutionX = Integer.parseInt(args[1]);
 		int resolutionY = Integer.parseInt(args[2]);
 
-		VideoOutput videoOutput = switch (exportType) {
-			case 2 -> new Bits8Output(outputFolder.resolve("video.dat"), resolutionX, resolutionY);
-			case 1 -> new TextFileOutput(outputFolder.resolve("video.txt"), resolutionX, resolutionY);
-			default -> new BufferedImageOutput(outputFolder, resolutionX, resolutionY, spike ? 1 : 0, 1, noVert);
-		};
+//		VideoOutput videoOutput = switch (exportType) {
+//			case 2 -> new Bits8Output(outputFolder.resolve("video.dat"), resolutionX, resolutionY);
+//			case 1 -> new TextFileOutput(outputFolder.resolve("video.txt"), resolutionX, resolutionY);
+//			default -> new BufferedImageOutput(outputFolder, resolutionX, resolutionY, spike ? 1 : 0, 1, noVert);
+//		};
+		VideoOutput videoOutput = new ConsoleOutput();
 
 		try (ZipFile src = new ZipFile(args[0])) {
 			if (args.length == 4) {
@@ -220,6 +221,7 @@ public class BadAppleOscilliscope {
 
 	private static boolean processFrame(int i, ZipFile src, VideoOutput output, boolean spike, Mode channelMode,
 										Threshold threshold) throws IOException {
+
 		String id = leftPad(i, 4);
 		ZipEntry entry = src.getEntry("frames/output_" + id + ".jpg");
 
@@ -232,6 +234,21 @@ public class BadAppleOscilliscope {
 		try (InputStream stream = new BufferedInputStream(src.getInputStream(entry))) {
 			frame = ImageIO.read(stream);
 		}
+
+		// hack to not do the actual purpose of this repo
+		{
+			int[][] framee = new int[32][24];
+
+			for (int y = 0; y < 24; y++) {
+				for (int x = 0; x < 32; x++) {
+					int rgba = frame.getRGB((int) (x * (32.0f/frame.getWidth())), (int) (y * (24.0f/frame.getHeight())));
+					int grey = (rgba >> 8) & 0xFF;
+					framee[x][y] = grey > 127 ? '#' : ' ';
+				}
+			}
+			output.writeFrame(framee);
+		}
+		if (true) return true;
 
 		// in smaller outputs this is the same as output.getHeight() - 1
 		int bottom = (int)(((double)output.getHeight()/frame.getHeight()) * (frame.getHeight() - 1));
