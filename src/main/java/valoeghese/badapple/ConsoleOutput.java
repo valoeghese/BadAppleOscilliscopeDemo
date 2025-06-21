@@ -12,6 +12,10 @@ public class ConsoleOutput extends VideoOutput {
             this.writer = new BufferedWriter(Files.newBufferedWriter(Path.of("out", "apple.cpp")));
             this.writer.write("#include <iostream>");
             this.writer.newLine();
+            this.writer.write("#include <chrono>");
+            this.writer.newLine();
+            this.writer.write("#include <thread>");
+            this.writer.newLine();
             this.writer.newLine();
         } catch (IOException e) {
             throw new RuntimeException(e);//bad practise
@@ -44,6 +48,8 @@ public class ConsoleOutput extends VideoOutput {
         for (int ii = 0; ii < i; ii++) {
             this.writer.write("  ");
             this.writer.write("frame" + (ii) + "();");
+            this.writer.newLine();
+            this.writer.write("std::this_thread::sleep_for(std::chrono::nanoseconds(33333300));");
             this.writer.newLine();
         }
         this.writer.write("}");
