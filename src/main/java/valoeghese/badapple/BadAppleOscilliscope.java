@@ -237,13 +237,13 @@ public class BadAppleOscilliscope {
 
 		// hack to not do the actual purpose of this repo
 		{
-			int[][] framee = new int[32][24];
+			int[][] framee = new int[24][64];
 
 			for (int y = 0; y < 24; y++) {
-				for (int x = 0; x < 32; x++) {
-					int rgba = frame.getRGB((int) (x * (32.0f/frame.getWidth())), (int) (y * (24.0f/frame.getHeight())));
+				for (int x = 0; x < 64; x++) {
+					int rgba = frame.getRGB((int) (x * (frame.getWidth()/64.0f)), (int) (y * (frame.getHeight()/24.0f)));
 					int grey = (rgba >> 8) & 0xFF;
-					framee[x][y] = grey > 127 ? '#' : ' ';
+					framee[y][x] = grey > 127 ? '#' : ' ';
 				}
 			}
 			output.writeFrame(framee);

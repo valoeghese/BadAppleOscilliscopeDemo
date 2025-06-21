@@ -7,7 +7,7 @@ import java.nio.file.Path;
 
 public class ConsoleOutput extends VideoOutput {
     public ConsoleOutput() {
-        super(32, 24);
+        super(64, 24);
         try{
             this.writer = new BufferedWriter(Files.newBufferedWriter(Path.of("out", "apple.cpp")));
             this.writer.write("#include <iostream>");
@@ -23,7 +23,7 @@ public class ConsoleOutput extends VideoOutput {
     int i = 0;
 
     @Override
-    public void writeFrame(int[]... channels) throws IOException {
+    public void writeFrame(int[][] channels) throws IOException {
         this.writer.write("void frame" + (i++) + "() {");
         this.writer.newLine();
         for (int[] row : channels) {
@@ -46,6 +46,8 @@ public class ConsoleOutput extends VideoOutput {
             this.writer.write("frame" + (ii) + "();");
             this.writer.newLine();
         }
+        this.writer.write("}");
+        this.writer.newLine();
         this.writer.close();
     }
 }
