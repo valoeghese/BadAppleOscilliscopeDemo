@@ -49,7 +49,7 @@ public class ConsoleOutput extends VideoOutput {
             this.writer.write("  ");
             this.writer.write("frame" + (ii) + "();");
             this.writer.newLine();
-            this.writer.write("std::this_thread::sleep_for(std::chrono::nanoseconds(33333300));");
+            this.writer.write("std::this_thread::sleep_for(std::chrono::nanoseconds(18333300));");
             this.writer.newLine();
         }
         this.writer.write("}");
